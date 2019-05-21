@@ -14,13 +14,13 @@ db.serialize(() => {
   db.run(`CREATE TABLE "RECORD" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "person_id" INTEGER NOT NULL,
-    "status" integer(2) NOT NULL,
+    "status" INTEGER(2) NOT NULL,
     "count" INTEGER NOT NULL,
     "price" REAL NOT NULL,
-    "total" real NOT NULL,
-    "date" text NOT NULL,
+    "total" real,
+    "date" INTEGER NOT NULL,
     "remark" TEXT,
-    "create_time" integer NOT NULL
+    "create_time" INTEGER NOT NULL
   )`, err => {
     logger(err);
   });

@@ -303,7 +303,7 @@ export default {
                   icon: 'ios-list-outline',
                 },
                 attrs: {
-                  title: '查看进出明细',
+                  title: '查看记录明细',
                 },
                 on: {
                   click: () => {

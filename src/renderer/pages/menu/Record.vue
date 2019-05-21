@@ -1,10 +1,3 @@
-<style lang="less">
-.price {
-  margin-left: 4px;
-  margin-bottom: 4px;
-}
-</style>
-
 <template>
   <div>
     <Form
@@ -34,13 +27,14 @@
           placement="bottom-end"
           style="width: 180px"
         ></DatePicker>
-        </FormItem>
+      </FormItem>
+      <FormItem :label-width="10">
         <Button
           type="primary"
-          class="price"
-          @click="setPrice"
-          :loading="priceLoading"
-        >水价{{price}}￥/方</Button>
+          icon="ios-search"
+          @click="getDataList('search')"
+          title="搜索"
+        ></Button>
         <Button
           class="price"
           type="primary"
@@ -48,15 +42,24 @@
           @click="add"
           title="创建"
         ></Button>
+        <Button
+          type="primary"
+          @click="setPrice"
+          :loading="priceLoading"
+        >水价{{price}}￥/方</Button>
+      </FormItem>
     </Form>
     <Table
+      border
+      stripe
       :columns="dataList_table_column"
       :data="dataList"
+      :loading="tableLoading"
     ></Table>
     <Modal
       v-model="modalShow"
       :mask-closable="false"
-      :title="modalTitle"
+      title="添加记录"
       @on-cancel="modalShow = false"
     >
       <div>
@@ -66,7 +69,6 @@
           :rules="ruleValidate"
           label-position="right"
           :label-width="130"
-          @keydown.native.enter.prevent="enterConfirm(modalParams.id)"
         >
           <FormItem
             label="户主"
@@ -126,15 +128,7 @@
         </Button>
         <Button
           type="primary"
-          v-if="!modalParams.id"
           @click="addConfirm"
-          :loading="modalBtnLoading"
-        >确认
-        </Button>
-        <Button
-          type="primary"
-          v-if="modalParams.id"
-          @click="editConfirm"
           :loading="modalBtnLoading"
         >确认
         </Button>
@@ -165,7 +159,7 @@
           long
           @click="savePrice"
           :loading="modalBtnLoading"
-          :disabled="price.length == 0 || isNaN(price)"
+          :disabled="isNaN(price) || price.length == 0"
         >保存</Button>
       </div>
     </Modal>
@@ -201,6 +195,7 @@ export default {
   data() {
     return {
       priceModalShow: false,
+      tableLoading: false,
       modalBtnLoading: false,
       priceLoading: false,
       modalShow: false,
@@ -307,29 +302,11 @@ export default {
                   icon: 'ios-list-outline',
                 },
                 attrs: {
-                  title: '查看进出明细',
+                  title: '修改状态',
                 },
                 on: {
                   click: () => {
                     this.direct(params.row);
-                  },
-                },
-              }),
-              h('Button', {
-                props: {
-                  type: 'primary',
-                  size: 'small',
-                  icon: 'edit',
-                },
-                attrs: {
-                  title: '修改',
-                },
-                style: {
-                  'margin-left': '5px',
-                },
-                on: {
-                  click: () => {
-                    this.edit(params.row);
                   },
                 },
               }),
@@ -376,11 +353,6 @@ export default {
       },
     };
   },
-  computed: {
-    modalTitle() {
-      return this.modalParams.id ? '修改记录' : '创建记录';
-    },
-  },
   methods: {
     getDataList(method) {
       this.tableLoading = true;
@@ -394,22 +366,22 @@ export default {
         : '';
       const rowSQL =
         `SELECT
-                        a.id,
-                        person_id,
-                        b.house,
-                        count,
-                        price,
-                        total,
-                        date,
-                        a.remark,
-                        a.create_time,
-                        status 
-                      FROM
-                        RECORD AS a
-                        LEFT JOIN PERSON AS b ON a.person_id = b.id ` +
+              a.id,
+              person_id,
+              b.house,
+              count,
+              price,
+              total,
+              date,
+              a.remark,
+              a.create_time,
+              status
+            FROM
+              RECORD AS a
+              LEFT JOIN PERSON AS b ON a.person_id = b.id ` +
         whereSQL +
         ` ORDER BY
-                        a.id DESC`;
+              a.id DESC`;
       this.$logger(rowSQL);
       this.$db.all(rowSQL, (err, res) => {
         if (err) {
@@ -427,66 +399,91 @@ export default {
     setPrice() {
       this.priceModalShow = true;
     },
-    enterConfirm(id) {
-      if (id) {
-        this.editConfirm();
-      } else {
-        this.addConfirm();
-      }
-    },
     delConfrim() {
       const deleteDetailSQL = `DELETE FROM RECORD WHERE id = ${
         this.modalParams.id
       }`;
       this.$logger(deleteDetailSQL);
+      this.$db.run(deleteDetailSQL, err => {
+        if (err) {
+          this.$logger(err);
+          this.$Notice.error({
+            title: '删除失败',
+            desc: err,
+          });
+        } else {
+          this.delModalShow = false;
+          this.$Message.success({
+            content: '删除成功',
+          });
+          this.getDataList();
+        }
+      });
     },
     addConfirm() {
       this.$refs.formVali.validate(valid => {
         if (valid) {
-          this.modalBtnLoading = true;
-          const modalParams = this.modalParams;
-          let total;
-          console.log(modalParams.date);
-          const pre = `SELECT count FROM RECORD WHERE person_id = '${
-            modalParams.house
-          }' ORDER BY id DESC`;
-          this.$logger(pre);
-          this.$db.get(pre, (err, res) => {
-            if (err) {
-              this.$logger(err);
-              this.$Notice.error({
-                title: '搜索失败',
-                desc: err,
-              });
-            } else {
-              if (typeof res === 'undefined') {
-                total = 0;
-              } else {
-                total = modalParams.count - res.count;
+          this.$db.serialize(() => {
+            this.$db.run('BEGIN');
+            this.modalBtnLoading = true;
+            const modalParams = this.modalParams;
+            const date = new Date(modalParams.date);
+            const sql = `INSERT INTO RECORD (person_id,count,status,price,date,remark,create_time) 
+            VALUES ('${modalParams.house}','${modalParams.count}',1,'${this.price}','${date.getTime()}','${modalParams.remark}','${Date.now()}')`;
+            this.$logger(sql);
+            this.$db.run(sql, err => {
+              if (err) {
+                this.$logger(err);
+                this.$db.run('ROLLBACK');
+                this.$Notice.error({
+                  title: '新增失败',
+                  desc: err,
+                });
               }
-              const sql = `INSERT INTO RECORD (person_id,status,count,price,total,date,remark,create_time) 
-          VALUES ('${modalParams.house}','${total ? 1 : 0}','${
-  modalParams.count
-}','${this.price}','${total}','${modalParams.date}','${
-  modalParams.remark
-}','${Date.now()}')`;
-              this.$logger(sql);
-              this.$db.run(sql, err => {
-                if (err) {
-                  this.$logger(err);
-                  this.$Notice.error({
-                    title: '新增失败',
-                    desc: err,
+            });
+            const sel = `SELECT id, count, total, status FROM RECORD WHERE person_id = '${
+              modalParams.house
+            }' ORDER BY date ASC`;
+            this.$db.all(sel, (err, res) => {
+              if (err) {
+                this.$logger(err);
+                this.$Notice.error({
+                  title: '搜索失败',
+                  desc: err,
+                });
+              } else {
+                res.map((item, index) => {
+                  const tmp = item;
+                  if (index === 0) {
+                    tmp.total = 0;
+                    tmp.status = 0;
+                  } else {
+                    tmp.status = 1;
+                    tmp.total = item.count - res[index - 1].count;
+                  }
+                  const sql = `UPDATE RECORD SET total='${tmp.total}', status='${tmp.status}' WHERE id='${tmp.id}'`;
+                  this.$logger(sql);
+                  this.$db.run(sql, err => {
+                    if (err) {
+                      this.$logger(err);
+                      this.$db.run('ROLLBACK');
+                      this.$Notice.error({
+                        title: '添加失败',
+                        desc: err,
+                      });
+                    }
                   });
-                } else {
-                  this.modalShow = false;
-                  this.$Message.success({
-                    content: '新增成功',
-                  });
-                }
-                this.modalBtnLoading = false;
-              });
-            }
+                  return 0;
+                });
+                this.getDataList();
+              }
+            });
+            this.$db.run('COMMIT');
+            this.modalBtnLoading = false;
+            this.modalShow = false;
+            this.$Message.success({
+              content: '添加成功',
+            });
           });
         }
       });
