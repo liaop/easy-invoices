@@ -58,7 +58,7 @@
       @on-row-dblclick="tableRowDblClick"
       :loading="tableLoading"
     ></Table>
-        <Page
+    <Page
       :total="dataListTotalCount"
       :current="searchParams.pageIndex"
       :page-size="searchParams.pageSize"
@@ -199,7 +199,7 @@ export default {
           { required: true, message: '请输入 户主名' },
           { max: 100, message: '户主 长度 100 以内' },
         ],
-        phone: [{ required: true, message: '请输入 联系方式' }],
+        phone: [{ max: 100, message: '联系方式 长度 100 以内' }],
         address: [
           { required: true, message: '请输入 住址' },
           { max: 100, message: '住址 长度 100 以内' },
@@ -379,8 +379,11 @@ export default {
       } OFFSET ${(searchParams.pageIndex - 1) * searchParams.pageSize} `;
       const orderSQL = `ORDER BY id ${searchParams.sort} `;
       const rowSQL =
-        'SELECT id,house,phone,address,remark,create_time,update_time FROM PERSON ' + whereSQL + orderSQL + pageSQL;
-      const countSQL = 'SELECT COUNT(id) AS totalCount from PERSON ' + whereSQL;
+        'SELECT id,house,phone,address,remark,create_time,update_time FROM PERSON ' +
+        whereSQL +
+        orderSQL +
+        pageSQL;
+      const countSQL = 'SELECT COUNT(id) AS totalCount FROM PERSON ' + whereSQL;
       this.$logger(rowSQL);
       this.$db.all(rowSQL, (err, res) => {
         if (err) {
@@ -459,7 +462,7 @@ export default {
         if (valid) {
           this.modalBtnLoading = true;
           const modalParams = this.modalParams;
-          const SQL = `SELECT id from PERSON WHERE house = '${
+          const SQL = `SELECT id FROM PERSON WHERE house = '${
             modalParams.house
           }'`;
           this.$db.get(SQL, (err, res) => {
@@ -523,7 +526,9 @@ export default {
             });
           }
         });
-        const deleteSQL = `DELETE FROM RECORD WHERE person_id = ${this.modalParams.id}`;
+        const deleteSQL = `DELETE FROM RECORD WHERE person_id = ${
+          this.modalParams.id
+        }`;
         this.$logger(deleteSQL);
         this.$db.run(deleteSQL, err => {
           if (err) {

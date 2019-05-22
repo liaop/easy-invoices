@@ -28,7 +28,7 @@ db.serialize(() => {
   db.run(`CREATE TABLE PERSON(
     id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
     house VARCHAR(255) NOT NULL,
-    phone VARCHAR(255) NOT NULL,
+    phone VARCHAR(255),
     address VARCHAR(255) NOT NULL,
     remark VARCHAR(255) NOT NULL,
     create_time INTEGER NOT NULL,

@@ -19,6 +19,24 @@
           >{{ item.house }}</Option>
         </Select>
       </FormItem>
+      <FormItem label="状态">
+        <Select
+          v-model="search.status"
+          style="width: 180px"
+          filterable
+          clearable
+        >
+          <Option
+            key='0'
+            value="0"
+          >底数</Option>
+          <Option
+            v-for="item in statusList"
+            :value="item.key"
+            :key="item.key"
+          >{{ item.name }}</Option>
+        </Select>
+      </FormItem>
       <FormItem label="日期">
         <DatePicker
           v-model="search.date"
@@ -27,6 +45,13 @@
           placement="bottom-end"
           style="width: 180px"
         ></DatePicker>
+      </FormItem>
+      <FormItem label="备注">
+        <Input
+          v-model="search.remark"
+          style="width: 180px"
+          clearable
+        />
       </FormItem>
       <FormItem :label-width="10">
         <Button
@@ -55,7 +80,76 @@
       :columns="dataList_table_column"
       :data="dataList"
       :loading="tableLoading"
+      @on-selection-change="selectResult"
     ></Table>
+    <Page
+      :total="dataListTotalCount"
+      :current="searchParams.pageIndex"
+      :page-size="searchParams.pageSize"
+      @on-change="getDataList"
+      @on-page-size-change="getDataListOnPageChange"
+      :page-size-opts="[10,20,30,40,50]"
+      show-total
+      show-sizer
+      show-elevator
+      transfer
+    ></Page>
+    <Modal
+      v-model="editShow"
+      :mask-closable="false"
+      title="修改记录"
+      @on-cancel="editShow = false"
+    >
+      <div>
+        <Form
+          ref="formChange"
+          :model="modalParamsChange"
+          :rules="ruleValidateChange"
+          label-position="right"
+          :label-width="130"
+        >
+          <FormItem
+            label="状态"
+            prop="status"
+          >
+            <Select
+              v-model="modalParamsChange.status"
+              style="width: 250px"
+              filterable
+            >
+              <Option
+                v-for="item in statusList"
+                :value="item.key"
+                :key="item.key"
+              >{{ item.name }}</Option>
+            </Select>
+          </FormItem>
+          <FormItem
+            label="备注"
+            prop="remark"
+          >
+            <Input
+              v-model="modalParamsChange.remark"
+              type="textarea"
+              :rows="4"
+              placeholder="非必填，长度 200 以内"
+              style="width: 250px"
+            />
+          </FormItem>
+        </Form>
+      </div>
+      <div slot="footer">
+        <Button @click="editShow = false">
+          取消
+        </Button>
+        <Button
+          type="primary"
+          @click="editForm"
+          :loading="modalBtnLoading"
+        >确认
+        </Button>
+      </div>
+    </Modal>
     <Modal
       v-model="modalShow"
       :mask-closable="false"
@@ -199,17 +293,24 @@ export default {
       modalBtnLoading: false,
       priceLoading: false,
       modalShow: false,
+      editShow: false,
       delModalShow: false,
       price: '0.0',
+      dataListTotalCount: 0,
       houses: [],
+      statusList: [{ key: 1, name: '未收款' }, { key: 2, name: '已付款' }],
       modalParams: {
         house: '',
         count: '',
         date: '',
         remark: '',
       },
+      modalParamsChange: {
+        remark: '',
+        status: '',
+      },
       search: {
-        house: '',
+        status: '',
         person_id: '',
         date: '',
         remark: '',
@@ -283,8 +384,45 @@ export default {
           render: (h, params) => {
             if (params.row.status === 1) {
               return h('div', { style: { color: 'red' } }, '未收款');
+            } else if (params.row.status === 2) {
+              return h('div', { style: { color: 'green' } }, '已付款');
             }
             return h('div', { style: { color: 'blue' } }, '底数');
+          },
+        },
+        {
+          title: '备注',
+          key: 'remark',
+          align: 'center',
+          minWidth: 180,
+          render: (h, params) => {
+            const remark = params.row.remark;
+            if (remark) {
+              return h(
+                'Tooltip',
+                {
+                  class: {
+                    'table-tooltip': true,
+                  },
+                  props: {
+                    delay: 800,
+                  },
+                },
+                [
+                  h('div', remark),
+                  h(
+                    'div',
+                    {
+                      style: {
+                        'white-space': 'normal',
+                      },
+                      slot: 'content',
+                    },
+                    remark
+                  ),
+                ]
+              );
+            }
           },
         },
         {
@@ -299,14 +437,14 @@ export default {
                 props: {
                   type: 'primary',
                   size: 'small',
-                  icon: 'ios-list-outline',
+                  icon: 'edit',
                 },
                 attrs: {
                   title: '修改状态',
                 },
                 on: {
                   click: () => {
-                    this.direct(params.row);
+                    this.status(params.row);
                   },
                 },
               }),
@@ -332,6 +470,13 @@ export default {
           },
         },
       ],
+      ruleValidateChange: {
+        status: [
+          { required: true, message: '请选择要更改状态' },
+          { type: 'number', message: '状态只能为正整数' },
+        ],
+        remark: [{ max: 200, message: '备注 长度 200 以内' }],
+      },
       ruleValidate: {
         house: [
           { required: true, message: '请选择户主' },
@@ -361,9 +506,20 @@ export default {
       }
       const searchParams = this.searchParams;
       let whereSQL = `WHERE a.remark LIKE '%${searchParams.remark}%' `;
-      searchParams.person_id !== ''
-        ? (whereSQL += ` AND a.person_id = ${searchParams.person_id}`)
+      searchParams.person_id ? (whereSQL += ` AND a.person_id = ${searchParams.person_id}`)
         : '';
+      if (searchParams.date['0'] && searchParams.date['1']) {
+        const start = new Date(searchParams.date['0']);
+        const end = new Date(searchParams.date['1']);
+        whereSQL += ` AND date < ${end.getTime()} AND date >=  ${start.getTime()} `;
+      }
+      [ '0', 1, 2 ].indexOf(searchParams.status) >= 0
+        ? (whereSQL += ` AND status='${searchParams.status}'`)
+        : null;
+      const pageSQL = `LIMIT ${
+        searchParams.pageSize
+      } OFFSET ${(searchParams.pageIndex - 1) * searchParams.pageSize} `;
+      const orderSQL = ` ORDER BY a.id ${searchParams.sort} `;
       const rowSQL =
         `SELECT
               a.id,
@@ -380,8 +536,9 @@ export default {
               RECORD AS a
               LEFT JOIN PERSON AS b ON a.person_id = b.id ` +
         whereSQL +
-        ` ORDER BY
-              a.id DESC`;
+        orderSQL +
+        pageSQL;
+      const countSQL = 'SELECT COUNT(a.id) AS totalCount FROM RECORD AS a ' + whereSQL;
       this.$logger(rowSQL);
       this.$db.all(rowSQL, (err, res) => {
         if (err) {
@@ -395,9 +552,75 @@ export default {
         }
         this.tableLoading = false;
       });
+      this.$db.get(countSQL, (err, res) => {
+        if (err) {
+          this.$logger(err);
+          this.$Notice.error({
+            title: '搜索失败',
+            desc: err,
+          });
+        } else {
+          this.dataListTotalCount = res.totalCount;
+        }
+      });
     },
     setPrice() {
       this.priceModalShow = true;
+    },
+    selectResult(e) {
+      console.log(e);
+    },
+    status(row) {
+      this.$refs.formChange.resetFields();
+      this.modalParamsChange = {
+        id: row.id,
+        status: row.status,
+        remark: row.remark,
+      };
+      this.editShow = true;
+    },
+    editForm() {
+      this.$refs.formChange.validate(valid => {
+        if (valid) {
+          this.modalBtnLoading = true;
+          const params = this.modalParamsChange;
+          const sql = `SELECT id FROM RECORD WHERE id='${params.id}'`;
+          this.$db.get(sql, err => {
+            if (err) {
+              this.$logger(err);
+              this.$Notice.error({
+                title: '搜索失败',
+                desc: err,
+              });
+            } else {
+              const updatSql = `UPDATE RECORD SET status='${
+                params.status
+              }',remark='${params.remark}' WHERE id=${params.id}`;
+              this.$logger(updatSql);
+              this.$db.run(updatSql, err => {
+                if (err) {
+                  this.$logger(err);
+                  this.$Notice.error({
+                    title: '编辑失败',
+                    desc: err,
+                  });
+                } else {
+                  this.editShow = false;
+                  this.$Message.success({
+                    content: '编辑成功',
+                  });
+                  this.getDataList();
+                }
+                this.modalBtnLoading = false;
+              });
+            }
+          });
+        }
+      });
+    },
+    getDataListOnPageChange(pageSize) {
+      this.search.pageSize = pageSize;
+      this.getDataList('search');
     },
     delConfrim() {
       const deleteDetailSQL = `DELETE FROM RECORD WHERE id = ${
@@ -421,6 +644,12 @@ export default {
       });
     },
     addConfirm() {
+      if (!this.price) {
+        this.$Notice.error({
+          title: '请设置水价',
+        });
+        return;
+      }
       this.$refs.formVali.validate(valid => {
         if (valid) {
           this.$db.serialize(() => {
@@ -429,7 +658,9 @@ export default {
             const modalParams = this.modalParams;
             const date = new Date(modalParams.date);
             const sql = `INSERT INTO RECORD (person_id,count,status,price,date,remark,create_time) 
-            VALUES ('${modalParams.house}','${modalParams.count}',1,'${this.price}','${date.getTime()}','${modalParams.remark}','${Date.now()}')`;
+            VALUES ('${modalParams.house}','${modalParams.count}',1,'${
+  this.price
+}','${date.getTime()}','${modalParams.remark}','${Date.now()}')`;
             this.$logger(sql);
             this.$db.run(sql, err => {
               if (err) {
@@ -458,10 +689,14 @@ export default {
                     tmp.total = 0;
                     tmp.status = 0;
                   } else {
-                    tmp.status = 1;
+                    if (tmp.status === 0) {
+                      tmp.status = 1;
+                    }
                     tmp.total = item.count - res[index - 1].count;
                   }
-                  const sql = `UPDATE RECORD SET total='${tmp.total}', status='${tmp.status}' WHERE id='${tmp.id}'`;
+                  const sql = `UPDATE RECORD SET total='${
+                    tmp.total
+                  }', status='${tmp.status}' WHERE id='${tmp.id}'`;
                   this.$logger(sql);
                   this.$db.run(sql, err => {
                     if (err) {
