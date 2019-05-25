@@ -373,7 +373,7 @@ export default {
           align: 'center',
           minWidth: 80,
           render: (h, params) => {
-            return h('div', params.row.total * params.row.price);
+            return h('div', parseInt(params.row.total * 100) * params.row.price / 100);
           },
         },
         {
@@ -519,7 +519,7 @@ export default {
       const pageSQL = `LIMIT ${
         searchParams.pageSize
       } OFFSET ${(searchParams.pageIndex - 1) * searchParams.pageSize} `;
-      const orderSQL = ` ORDER BY a.id ${searchParams.sort} `;
+      const orderSQL = ` ORDER BY a.date ${searchParams.sort} `;
       const rowSQL =
         `SELECT
               a.id,
