@@ -18,6 +18,7 @@ db.serialize(() => {
     "count" INTEGER NOT NULL,
     "price" REAL NOT NULL,
     "total" real,
+    "pre" INTEGER,
     "date" INTEGER NOT NULL,
     "remark" TEXT,
     "create_time" INTEGER NOT NULL

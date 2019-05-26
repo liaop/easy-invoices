@@ -307,7 +307,7 @@ export default {
                 },
                 on: {
                   click: () => {
-                    this.direct(params.row);
+                    this.total(params.row);
                   },
                 },
               }),
@@ -423,6 +423,14 @@ export default {
     sort(v) {
       this.search.sort = v.order.toUpperCase();
       this.getDataList('search');
+    },
+    total(row) {
+      this.$router.push({
+        path: '/total',
+        query: {
+          person_id: row.id,
+        },
+      });
     },
     direct(row) {
       this.$router.push({

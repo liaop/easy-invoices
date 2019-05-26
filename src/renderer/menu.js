@@ -1,5 +1,6 @@
 import Person from './pages/menu/Person.vue';
 import Record from './pages/menu/Record.vue';
+import Total from './pages/menu/Total.vue';
 
 const menu = [
   {
@@ -13,6 +14,11 @@ const menu = [
     title: '记录',
     path: '/record',
     component: Record,
+  }, {
+    icon: 'pie-graph',
+    title: '统计',
+    path: '/total',
+    component: Total,
   },
 ];
 export default menu;

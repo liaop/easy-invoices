@@ -61,11 +61,17 @@
           title="搜索"
         ></Button>
         <Button
-          class="price"
           type="primary"
           icon="plus-round"
           @click="add"
           title="创建"
+        ></Button>
+        <Button
+          type="primary"
+          icon="edit"
+          :disabled="!selectList.length"
+          @click="editPuls"
+          title="编辑"
         ></Button>
         <Button
           type="primary"
@@ -80,6 +86,7 @@
       :columns="dataList_table_column"
       :data="dataList"
       :loading="tableLoading"
+      @on-sort-change="sort"
       @on-selection-change="selectResult"
     ></Table>
     <Page
@@ -126,6 +133,7 @@
           </FormItem>
           <FormItem
             label="备注"
+            v-if="!selectAction"
             prop="remark"
           >
             <Input
@@ -143,8 +151,16 @@
           取消
         </Button>
         <Button
+          v-if="!selectAction"
           type="primary"
           @click="editForm"
+          :loading="modalBtnLoading"
+        >确认
+        </Button>
+        <Button
+          v-if="selectAction"
+          type="primary"
+          @click="editSelect"
           :loading="modalBtnLoading"
         >确认
         </Button>
@@ -295,9 +311,11 @@ export default {
       modalShow: false,
       editShow: false,
       delModalShow: false,
+      selectAction: false,
       price: '0.0',
       dataListTotalCount: 0,
       houses: [],
+      selectList: [],
       statusList: [{ key: 1, name: '未收款' }, { key: 2, name: '已付款' }],
       modalParams: {
         house: '',
@@ -314,6 +332,7 @@ export default {
         person_id: '',
         date: '',
         remark: '',
+        order: 'date',
         sort: 'DESC',
         pageIndex: 1,
         pageSize: 10,
@@ -330,12 +349,14 @@ export default {
           title: '户主',
           key: 'house',
           align: 'center',
+          sortable: 'custom',
           minWidth: 80,
         },
         {
           title: '抄表日期',
           key: 'date',
           align: 'center',
+          sortable: 'custom',
           minWidth: 120,
           render: (h, params) => {
             const date = new Date(params.row.date);
@@ -373,7 +394,10 @@ export default {
           align: 'center',
           minWidth: 80,
           render: (h, params) => {
-            return h('div', parseInt(params.row.total * 100) * params.row.price / 100);
+            return h(
+              'div',
+              (parseInt(params.row.total * 100) * params.row.price) / 100
+            );
           },
         },
         {
@@ -506,7 +530,8 @@ export default {
       }
       const searchParams = this.searchParams;
       let whereSQL = `WHERE a.remark LIKE '%${searchParams.remark}%' `;
-      searchParams.person_id ? (whereSQL += ` AND a.person_id = ${searchParams.person_id}`)
+      searchParams.person_id
+        ? (whereSQL += ` AND a.person_id = ${searchParams.person_id}`)
         : '';
       if (searchParams.date['0'] && searchParams.date['1']) {
         const start = new Date(searchParams.date['0']);
@@ -519,7 +544,7 @@ export default {
       const pageSQL = `LIMIT ${
         searchParams.pageSize
       } OFFSET ${(searchParams.pageIndex - 1) * searchParams.pageSize} `;
-      const orderSQL = ` ORDER BY a.date ${searchParams.sort} `;
+      const orderSQL = ` ORDER BY ${searchParams.order}  ${searchParams.sort} `;
       const rowSQL =
         `SELECT
               a.id,
@@ -538,7 +563,8 @@ export default {
         whereSQL +
         orderSQL +
         pageSQL;
-      const countSQL = 'SELECT COUNT(a.id) AS totalCount FROM RECORD AS a ' + whereSQL;
+      const countSQL =
+        'SELECT COUNT(a.id) AS totalCount FROM RECORD AS a ' + whereSQL;
       this.$logger(rowSQL);
       this.$db.all(rowSQL, (err, res) => {
         if (err) {
@@ -567,17 +593,54 @@ export default {
     setPrice() {
       this.priceModalShow = true;
     },
-    selectResult(e) {
-      console.log(e);
+    selectResult(list) {
+      this.selectList = list;
     },
     status(row) {
       this.$refs.formChange.resetFields();
       this.modalParamsChange = {
-        id: row.id,
         status: row.status,
-        remark: row.remark,
       };
       this.editShow = true;
+    },
+    editPuls() {
+      this.$refs.formChange.resetFields();
+      this.modalParamsChange = {
+        status: 2,
+      };
+      this.selectAction = true;
+      this.editShow = true;
+    },
+    editSelect() {
+      this.$refs.formChange.validate(valid => {
+        if (valid) {
+          this.modalBtnLoading = true;
+          const params = this.modalParamsChange;
+          const ids = this.selectList.map(item => item.id);
+          const sql = `UPDATE RECORD SET status=${params.status} WHERE id IN(${ids.join(',')})`;
+          this.$logger(sql);
+          this.$db.run(sql, err => {
+            if (err) {
+              this.$logger(err);
+              this.$Notice.error({
+                title: '编辑失败',
+                desc: err,
+              });
+            } else {
+              this.$Message.success({
+                content: '编辑成功',
+              });
+              this.getDataList();
+              this.selectList = [];
+              this.modalBtnLoading = false;
+              this.selectAction = false;
+              this.editShow = false;
+            }
+          });
+
+
+        }
+      });
     },
     editForm() {
       this.$refs.formChange.validate(valid => {
@@ -643,6 +706,11 @@ export default {
         }
       });
     },
+    sort(v) {
+      this.search.sort = v.order.toUpperCase();
+      this.search.order = v.key === 'house' ? 'person_id' : v.key;
+      this.getDataList('search');
+    },
     addConfirm() {
       if (!this.price) {
         this.$Notice.error({
@@ -672,7 +740,7 @@ export default {
                 });
               }
             });
-            const sel = `SELECT id, count, total, status FROM RECORD WHERE person_id = '${
+            const sel = `SELECT id, count, total, status, date, pre FROM RECORD WHERE person_id = '${
               modalParams.house
             }' ORDER BY date ASC`;
             this.$db.all(sel, (err, res) => {
@@ -688,15 +756,17 @@ export default {
                   if (index === 0) {
                     tmp.total = 0;
                     tmp.status = 0;
+                    tmp.pre = 0;
                   } else {
                     if (tmp.status === 0) {
                       tmp.status = 1;
                     }
+                    tmp.pre = res[index - 1].date;
                     tmp.total = item.count - res[index - 1].count;
                   }
                   const sql = `UPDATE RECORD SET total='${
                     tmp.total
-                  }', status='${tmp.status}' WHERE id='${tmp.id}'`;
+                  }', status='${tmp.status}', pre='${tmp.pre}' WHERE id='${tmp.id}'`;
                   this.$logger(sql);
                   this.$db.run(sql, err => {
                     if (err) {
