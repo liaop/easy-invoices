@@ -82,7 +82,6 @@
   </div>
 </template>
 <script>
-import { ipcRenderer } from 'electron';
 export default {
   data() {
     return {
@@ -295,14 +294,7 @@ export default {
       this.selectList = list;
     },
     printer() {
-      ipcRenderer.send('getPrinterList');
-
-      // 监听主线程获取到打印机列表后的回调
-      ipcRenderer.once('getPrinterList', (event, data) => {
-        console.log(data);
-
-        this.printList = data;
-      });
+      console.log('aa');
     },
     getDataListOnPageChange(pageSize) {
       this.search.pageSize = pageSize;
