@@ -53,8 +53,8 @@
           type="primary"
           icon="printer"
           :disabled="!selectList.length"
-          @click="printer"
-          title="编辑"
+          @click="printerSelect"
+          title="打印"
         ></Button>
       </FormItem>
     </Form>
@@ -86,7 +86,6 @@ export default {
   data() {
     return {
       tableLoading: false,
-      price: '0.0',
       dataListTotalCount: 0,
       houses: [],
       selectList: [],
@@ -249,6 +248,7 @@ export default {
         `SELECT
               person_id,
               b.house,
+              b.address,
               status,
               a.price,
               MAX( date ) AS till,
@@ -264,7 +264,8 @@ export default {
         orderSQL +
         pageSQL;
       const countSQL =
-        'SELECT COUNT(DISTINCT person_id) AS totalCount FROM RECORD AS a ' + whereSQL;
+        'SELECT COUNT(DISTINCT person_id) AS totalCount FROM RECORD AS a ' +
+        whereSQL;
       this.$logger(rowSQL);
       this.$db.all(rowSQL, (err, res) => {
         if (err) {
@@ -293,8 +294,11 @@ export default {
     selectResult(list) {
       this.selectList = list;
     },
-    printer() {
-      console.log('aa');
+    printer(rows) {
+      console.log(rows);
+    },
+    printerSelect() {
+      console.log(this.selectList);
     },
     getDataListOnPageChange(pageSize) {
       this.search.pageSize = pageSize;
