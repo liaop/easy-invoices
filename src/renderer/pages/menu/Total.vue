@@ -1,3 +1,25 @@
+<style>
+.preview table {
+  width: 100%;
+}
+.preview table,
+.preview th,
+.preview td {
+  border: 1px solid black;
+  border-collapse: collapse;
+}
+.preview th,
+.preview td {
+  padding: 5px;
+  text-align: left;
+}
+.title {
+  font-size: 18px;
+  text-align: center;
+  margin-bottom: 0px;
+}
+</style>
+
 <template>
   <div>
     <Form
@@ -79,15 +101,79 @@
       show-elevator
       transfer
     ></Page>
+    <Modal
+      v-model="modalShow"
+      width="650"
+      @on-cancel="modalShow=false"
+      title="打印"
+    >
+      <br />
+      <div
+        class="preview"
+        v-for="(v,index) in prints"
+        :key='index'
+      >
+        <p class="title">(__)年(____)月水费收费单</p>
+        <table>
+          <tr>
+            <th>地址</th>
+            <th>户主</th>
+            <th>上次抄表(底方)</th>
+            <th>本次抄表(方)</th>
+            <th>用水量(方)</th>
+            <th>单价(元)</th>
+            <th>合币(元)</th>
+          </tr>
+          <tr>
+            <td>{{v.address}}</td>
+            <td>{{v.house}}</td>
+            <td>{{v.pre}}</td>
+            <td>{{v.cur}}</td>
+            <td>{{v.account}}</td>
+            <td>{{v.price}}</td>
+            <td>{{v.total}}</td>
+          </tr>
+        </table>
+        <p style="text-align: right;margin: 0px">抄表日期:{{getTime(v.start)}}/{{getTime(v.till)}}</p>
+      </div>
+      <div>
+        <webview
+          style="height: 0px"
+          src="../../../static/print.html"
+          nodeintegration
+        ></webview>
+      </div>
+      <div slot="footer">
+        <Button @click="modalShow = false">
+          取消
+        </Button>
+        <Button
+          type="primary"
+          @click="printerResult"
+          :loading="modalBtnLoading"
+        >打印
+        </Button>
+        <Button
+          type="warning"
+          @click="printerPay"
+          :loading="modalBtnLoading"
+        >付款打印
+        </Button>
+      </div>
+    </Modal>
   </div>
 </template>
 <script>
+const ipcRenderer = require('electron').ipcRenderer;
 export default {
   data() {
     return {
+      modalShow: false,
+      modalBtnLoading: false,
       tableLoading: false,
       dataListTotalCount: 0,
       houses: [],
+      prints: [],
       selectList: [],
       statusList: [{ key: 1, name: '未收款' }, { key: 2, name: '已付款' }],
       search: {
@@ -106,6 +192,13 @@ export default {
           minWidth: 30,
           align: 'center',
           fixed: 'left',
+        },
+        {
+          title: '条',
+          key: 'num',
+          minWidth: 40,
+          align: 'center',
+          sortable: 'true',
         },
         {
           title: '户主',
@@ -220,7 +313,31 @@ export default {
       ],
     };
   },
+  mounted() {
+    this.getPrinterList();
+    this.print();
+  },
   methods: {
+    print() {
+      const webview = document.querySelector('webview');
+      webview.addEventListener('ipc-message', event => {
+        if (event.channel === 'pong') {
+          webview.print(
+            {
+              silent: false,
+              printBackground: true,
+            },
+            data => {
+              this.$logger(data);
+            }
+          );
+        }
+      });
+    },
+    getPrinterList() {
+      ipcRenderer.send('getPrinterList');
+      ipcRenderer.once('getPrinterList', (event, data) => this.$logger(data));
+    },
     getDataList(method) {
       this.tableLoading = true;
       if (method === 'search') {
@@ -246,6 +363,7 @@ export default {
       const orderSQL = ` ORDER BY ${searchParams.order}  ${searchParams.sort} `;
       const rowSQL =
         `SELECT
+              count(a.id) AS num,
               person_id,
               b.house,
               b.address,
@@ -295,10 +413,40 @@ export default {
       this.selectList = list;
     },
     printer(rows) {
-      console.log(rows);
+      const webview = document.querySelector('webview');
+      webview.send('clear', []);
+      this.prints = [ rows ];
+      this.modalShow = true;
+    },
+    printerResult() {
+      this.modalShow = false;
+      const webview = document.querySelector('webview');
+      webview.send('ping', this.prints);
+    },
+    printerPay() {
+      this.prints.map(v => {
+        const sql = `UPDATE RECORD SET status = 2 WHERE person_id ='${v.person_id}' AND pre >= ${v.start} AND date <= ${v.till}`;
+        this.$db.run(sql, err => {
+          if (err) {
+            this.$logger(err);
+            this.$Notice.error({
+              title: '编辑失败',
+              desc: err,
+            });
+          }
+        });
+        return 0;
+      });
+      this.modalShow = false;
+      this.getDataList('search');
+      const webview = document.querySelector('webview');
+      webview.send('ping', this.prints);
     },
     printerSelect() {
-      console.log(this.selectList);
+      const webview = document.querySelector('webview');
+      webview.send('clear', []);
+      this.prints = this.selectList;
+      this.modalShow = true;
     },
     getDataListOnPageChange(pageSize) {
       this.search.pageSize = pageSize;
@@ -307,6 +455,12 @@ export default {
     sort(v) {
       this.search.sort = v.order.toUpperCase();
       this.getDataList('search');
+    },
+    getTime(item) {
+      const date = new Date(item);
+      return (
+        date.getFullYear() + '-' + (date.getMonth() + 1) + '-' + date.getDate()
+      );
     },
     getHouses() {
       const sql = 'SELECT id,house FROM PERSON';

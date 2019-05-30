@@ -26,9 +26,15 @@ function createWindow() {
     minWidth: 800,
     minHeight: 600,
     show: false,
+    webPreferences: { webSecurity: false },
   });
 
   mainWindow.loadURL(winURL);
+
+  ipcMain.on('getPrinterList', () => {
+    const list = mainWindow.webContents.getPrinters();
+    mainWindow.webContents.send('getPrinterList', list);
+  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;

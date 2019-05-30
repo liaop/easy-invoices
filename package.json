@@ -81,7 +81,7 @@
     ]
   },
   "dependencies": {
-    "sqlite3": "^4.0.8"
+    "sqlite3": "^4.0.1"
   },
   "devDependencies": {
     "axios": "^0.16.1",
@@ -97,7 +97,7 @@
     "chalk": "^2.4.2",
     "copy-webpack-plugin": "^4.6.0",
     "cross-env": "^5.2.0",
-    "css-loader": "^2.1.1",
+    "css-loader": "^0.28.4",
     "dayjs": "^1.8.14",
     "del": "^3.0.0",
     "devtron": "^1.4.0",

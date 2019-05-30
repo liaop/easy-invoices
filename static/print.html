@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <script src="https://cdn.bootcss.com/vue/2.2.2/vue.min.js"></script>
+    <title>Document</title>
+    <style>
+        table {
+            width: 100%
+        }
+        table, th, td {
+            border: 1px solid black;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 5px;
+            text-align: left;    
+        }
+        .title {
+            font-size: 18px;
+            text-align: center;
+            margin-bottom: 0px;
+        }
+</style>
+</head>
+
+<body>
+    <div id='app'>
+        <br />
+        <div v-for="v in arr">
+            <p class="title">(__)年(____)月水费收费单</p>
+            <table>
+                <tr>
+                    <th>地址</th>
+                    <th>户主</th>
+                    <th>上次抄表(底方)</th>
+                    <th>本次抄表(方)</th>
+                    <th>用水量(方)</th>
+                    <th>单价(元)</th>
+                    <th>合币(元)</th>
+                </tr>
+                <tr>
+                    <td>{{v.address}}</td>
+                    <td>{{v.house}}</td>
+                    <td>{{v.pre}}</td>
+                    <td>{{v.cur}}</td>
+                    <td>{{v.account}}</td>
+                    <td>{{v.price}}</td>
+                    <td>{{v.total}}</td>
+                </tr>
+            </table>
+            <p style="text-align: right;margin: 0px">抄表日期:{{getTime(v.start)}}/{{getTime(v.till)}}</p>
+        </div>
+    </div>
+</body>
+<script>
+    const {
+        ipcRenderer
+    } = require('electron')
+    new Vue({
+        el: "#app",
+        data: {
+            arr: []
+        },
+        mounted() {
+            ipcRenderer.on('ping', (e, arr) => {
+                this.arr = arr;
+                ipcRenderer.sendToHost('pong');
+            });
+            ipcRenderer.on('clear', (e, arr) => {
+                this.arr = arr;
+                ipcRenderer.sendToHost('wong');
+            })
+        },
+        methods: {
+            getTime(item) {
+                const date = new Date(item);
+                return date.getFullYear() +
+                '-' +
+                (date.getMonth() + 1) +
+                '-' +
+                date.getDate();
+            }
+        }
+    })
+</script>
+
+</html>
