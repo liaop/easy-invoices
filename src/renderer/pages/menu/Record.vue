@@ -751,7 +751,7 @@ export default {
                   desc: err,
                 });
               } else {
-                res.map((item, index) => {
+                const updates = res.map((item, index) => {
                   const tmp = item;
                   if (index === 0) {
                     tmp.total = 0;
@@ -767,25 +767,27 @@ export default {
                   const sql = `UPDATE RECORD SET total='${
                     tmp.total
                   }', status='${tmp.status}', pre='${tmp.pre}' WHERE id='${tmp.id}'`;
-                  this.$logger(sql);
-                  this.$db.run(sql, err => {
-                    if (err) {
-                      this.$logger(err);
-                      this.$db.run('ROLLBACK');
-                      this.$Notice.error({
-                        title: '添加失败',
-                        desc: err,
-                      });
-                    }
-                  });
-                  return 0;
+                  return sql;
                 });
-                this.getDataList();
+                this.$logger(updates);
+                this.$logger(updates.join(';'));
+                const str = updates.join(';');
+                this.$db.exec(str, err => {
+                  if (err) {
+                    this.$logger(err);
+                    this.$db.run('ROLLBACK');
+                    this.$Notice.error({
+                      title: '添加失败',
+                      desc: err,
+                    });
+                  }
+                });
               }
             });
             this.$db.run('COMMIT');
             this.modalBtnLoading = false;
             this.modalShow = false;
+            this.getDataList();
             this.$Message.success({
               content: '添加成功',
             });

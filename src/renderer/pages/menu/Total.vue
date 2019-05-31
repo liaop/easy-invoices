@@ -424,18 +424,18 @@ export default {
       webview.send('ping', this.prints);
     },
     printerPay() {
-      this.prints.map(v => {
-        const sql = `UPDATE RECORD SET status = 2 WHERE person_id ='${v.person_id}' AND pre >= ${v.start} AND date <= ${v.till}`;
-        this.$db.run(sql, err => {
-          if (err) {
-            this.$logger(err);
-            this.$Notice.error({
-              title: '编辑失败',
-              desc: err,
-            });
-          }
-        });
-        return 0;
+      const updates = this.prints.map(v => {
+        return `UPDATE RECORD SET status = 2 WHERE person_id ='${v.person_id}' AND pre >= ${v.start} AND date <= ${v.till}`;
+      });
+      const str = updates.join(';');
+      this.$db.exec(str, err => {
+        if (err) {
+          this.$logger(err);
+          this.$Notice.error({
+            title: '编辑失败',
+            desc: err,
+          });
+        }
       });
       this.modalShow = false;
       this.getDataList('search');
