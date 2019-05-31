@@ -30,7 +30,7 @@
     "packageVersion": "echo $npm_package_version"
   },
   "build": {
-    "productName": "easy-invoices",
+    "productName": "水费计费",
     "copyright": "caandoll",
     "appId": "org.caandoll.easy-invoices",
     "directories": {
@@ -55,13 +55,16 @@
       ]
     },
     "mac": {
-      "icon": "build/icons/icon.png"
+      "icon": "build/icons/icon.png",
+      "extraResources": "./static/*.html"
     },
     "win": {
-      "icon": "build/icons/icon.png"
+      "icon": "build/icons/icon.png",
+      "extraResources": "./static/*.html"
     },
     "linux": {
-      "icon": "build/icons/icon.png"
+      "icon": "build/icons/icon.png",
+      "extraResources": "./static/*.html"
     },
     "nsis": {
       "oneClick": false,
