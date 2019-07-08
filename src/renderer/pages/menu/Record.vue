@@ -528,6 +528,9 @@ export default {
       if (method === 'search') {
         this.searchParams = JSON.parse(JSON.stringify(this.search));
       }
+      if (typeof method === 'number') {
+        this.searchParams.pageIndex = method;
+      }
       const searchParams = this.searchParams;
       let whereSQL = `WHERE a.remark LIKE '%${searchParams.remark}%' `;
       searchParams.person_id

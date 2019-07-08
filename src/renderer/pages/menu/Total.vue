@@ -95,7 +95,7 @@
       :page-size="searchParams.pageSize"
       @on-change="getDataList"
       @on-page-size-change="getDataListOnPageChange"
-      :page-size-opts="[10,20,30,40,50]"
+      :page-size-opts="[9,20,130]"
       show-total
       show-sizer
       show-elevator
@@ -113,7 +113,7 @@
         v-for="(v,index) in prints"
         :key='index'
       >
-        <p class="title">(__)年(____)月水费收费单</p>
+        <p class="title">葫芦六组水费收费单</p>
         <table>
           <tr>
             <th>地址</th>
@@ -183,7 +183,7 @@ export default {
         order: 'person_id',
         sort: 'DESC',
         pageIndex: 1,
-        pageSize: 10,
+        pageSize: 9,
       },
       dataList: [],
       dataList_table_column: [
@@ -342,6 +342,9 @@ export default {
       this.tableLoading = true;
       if (method === 'search') {
         this.searchParams = JSON.parse(JSON.stringify(this.search));
+      }
+      if (typeof method === 'number') {
+        this.searchParams.pageIndex = method;
       }
       const searchParams = this.searchParams;
       let whereSQL = '';
